@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Twinvoy camera</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
+  canvas { width: 100vw; height: 100vh; object-fit: cover; display: block; }
+  /* second, page-level badge: stays even if the server-side stamp is cropped */
+  #badge { position: fixed; right: 2vw; bottom: 2vh; padding: .5em .9em;
+           background: rgba(200,40,40,.9); color: #fff; font: 600 2.2vh system-ui, sans-serif;
+           border-radius: .4em; letter-spacing: .04em; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1280" height="720"></canvas>
+<div id="badge">AI TWIN of __OWNER__</div>
+<script>
+const TOKEN = "__TOKEN__";
+const base = location.origin.replace(/^http/, "ws");
+const canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
+let audioCtx = null, playHead = 0;
+
+function playPcm(buf) {
+  const sr = new DataView(buf).getUint32(1, true);
+  const pcm = new Int16Array(buf.slice(5));
+  audioCtx = audioCtx || new AudioContext();
+  const ab = audioCtx.createBuffer(1, pcm.length, sr);
+  const ch = ab.getChannelData(0);
+  for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+  const src = audioCtx.createBufferSource();
+  src.buffer = ab; src.connect(audioCtx.destination);
+  playHead = Math.max(playHead, audioCtx.currentTime + 0.05);
+  src.start(playHead); playHead += ab.duration;
+}
+
+function connectMedia() {
+  const ws = new WebSocket(`${base}/ws/media?token=${TOKEN}`);
+  ws.binaryType = "arraybuffer";
+  ws.onmessage = async (e) => {
+    const kind = new Uint8Array(e.data, 0, 1)[0];
+    if (kind === 86) { // 'V'
+      const bmp = await createImageBitmap(new Blob([e.data.slice(1)], {type: "image/jpeg"}));
+      ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    } else if (kind === 65) { playPcm(e.data); } // 'A'
+  };
+  const ping = setInterval(() => ws.readyState === 1 && ws.send("ping"), 10000);
+  ws.onclose = () => { clearInterval(ping); setTimeout(connectMedia, 1000); };
+}
+
+function connectTranscript() {
+  const up = new WebSocket(`${base}/ws/transcript?token=${TOKEN}`);
+  // Recall exposes the live meeting transcript to output-media pages here:
+  const rec = new WebSocket("wss://meeting-data.bot.recall.ai/api/v1/transcript");
+  rec.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      const t = d.transcript || (d.data && d.data.transcript) || d;
+      if (t.is_final === false) return;
+      const words = t.words || (d.data && d.data.words) || [];
+      const text = words.map(w => w.text).join(" ").trim();
+      const speaker = t.speaker || (t.participant && t.participant.name) || "Someone";
+      if (text && up.readyState === 1) up.send(JSON.stringify({speaker, text}));
+    } catch (_) {}
+  };
+  rec.onclose = () => setTimeout(connectTranscript, 2000);
+}
+
+connectMedia();
+if (new URLSearchParams(location.search).get("test") === "1") {
+  // local test mode: type what a meeting participant says
+  const up = new WebSocket(`${base}/ws/transcript?token=${TOKEN}`);
+  const box = document.createElement("form");
+  box.style = "position:fixed;left:2vw;bottom:2vh;display:flex;gap:6px;font:14px system-ui";
+  box.innerHTML = '<input name="who" value="Sam" style="width:70px">' +
+    '<input name="say" placeholder="e.g. Akshay, what is the deploy status?" style="width:340px">' +
+    '<button>Say</button>';
+  box.onsubmit = (e) => {
+    e.preventDefault();
+    audioCtx = audioCtx || new AudioContext();
+    const f = new FormData(box);
+    if (f.get("say")) up.send(JSON.stringify({speaker: f.get("who"), text: f.get("say")}));
+    box.say.value = "";
+  };
+  document.body.appendChild(box);
+} else {
+  connectTranscript();
+}
+</script>
+</body>
+</html>

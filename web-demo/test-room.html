@@ -1,0 +1,388 @@
+<title>Twinvoy Test Room</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a meeting tile on the left, the conversation panel on the right; stacks on phones. */
+:root {
+  --bg: #eef0f3; --panel: #ffffff; --line: #d6dae1; --fg: #161a22; --muted: #5b6372;
+  --accent: #2f5bd3; --badge: #c8282d; --ok: #1d7a4f; --warn: #a8640a; --tile: #1b2029;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11141a; --panel: #191d25; --line: #2b313d; --fg: #e7eaf0; --muted: #98a1b2;
+  --accent: #7f9cf5; --badge: #e0474c; --ok: #4cc28c; --warn: #e3a24a; --tile: #0b0d11; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11141a; --panel: #191d25; --line: #2b313d; --fg: #e7eaf0; --muted: #98a1b2;
+  --accent: #7f9cf5; --badge: #e0474c; --ok: #4cc28c; --warn: #e3a24a; --tile: #0b0d11; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 18px; }
+h1 { font: 700 clamp(24px, 3vw, 32px)/1.1 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 62ch; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.tilebox { background: var(--tile); border-radius: 14px; overflow: hidden; }
+canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; max-width: 100%; }
+.tilebar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; }
+.name { font: 500 13px var(--mono); color: var(--muted); }
+.spacer { flex: 1; }
+button, .filebtn { font: 500 14px var(--body); border-radius: 8px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+button.primary, .filebtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:focus-visible, .filebtn:focus-within, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: default; }
+.filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.filebtn { position: relative; display: inline-flex; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; min-width: 0; }
+.panel h2 { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; padding: 14px 16px 0; }
+.log { list-style: none; margin: 0; padding: 10px 16px; display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; min-height: 160px; }
+.log li { min-width: 0; }
+.who { font: 500 12px var(--mono); color: var(--muted); }
+.who.twin { color: var(--badge); }
+.log p { margin: 2px 0 0; overflow-wrap: anywhere; }
+form { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+@media (max-width: 480px) { form { grid-template-columns: minmax(0, 1fr) auto; } #who { grid-column: 1 / -1; } }
+input[type=text] { font: 15px var(--body); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
+.chips button { font-size: 13px; padding: 5px 10px; border-radius: 999px; }
+.follow { margin: 0; padding: 8px 16px 16px 34px; color: var(--fg); }
+.follow:empty::before { content: "Nothing yet. Ask the twin to approve or commit to something."; color: var(--muted); margin-left: -18px; display: block; }
+.status { font: 13px var(--mono); color: var(--muted); padding: 0 16px 10px; min-height: 1.4em; }
+.err { color: var(--warn); }
+.rules { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.rule { border-top: 2px solid var(--line); padding-top: 10px; }
+.rule b { font: 500 14px var(--body); display: block; }
+.rule span { color: var(--muted); font-size: 14px; }
+.capture, .angles { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.caplabel { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); width: 100%; }
+.thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.thumbs button { padding: 0; border-radius: 8px; overflow: hidden; border: 2px solid var(--line); line-height: 0; }
+.thumbs button[aria-pressed="true"] { border-color: var(--accent); }
+.thumbs img { width: 104px; height: 78px; object-fit: cover; }
+.ownerrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ownerrow label { font: 500 12px var(--mono); color: var(--muted); }
+#owner { width: 150px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Twinvoy test room</h1>
+      <p class="sub">Add your face with the camera or a photo, then speak as a meeting participant. Your AI twin answers out loud, defers anything binding to you, and always shows its badge. Nothing leaves this page except the text sent to Claude.</p>
+    </div>
+    <div class="ownerrow">
+      <label for="owner">Owner</label>
+      <input type="text" id="owner" value="Akshay D" autocomplete="off">
+    </div>
+  </header>
+
+  <div class="grid">
+    <section>
+      <div class="tilebox"><canvas id="tile" width="1280" height="720" aria-label="Your AI twin's video tile"></canvas></div>
+      <div class="tilebar">
+        <span class="name" id="tilename">Akshay D (AI twin)</span>
+        <span class="spacer"></span>
+        <button type="button" id="intro">Join and introduce</button>
+        <button type="button" id="mute" aria-pressed="false">Mute voice</button>
+      </div>
+      <div class="capture" aria-label="Add your face">
+        <span class="caplabel">Add your face</span>
+        <button type="button" class="primary" id="cam">Use webcam</button>
+        <button type="button" id="snap" hidden>Capture</button>
+        <button type="button" id="camstop" hidden>Close camera</button>
+        <label class="filebtn" for="take">Take photo<input type="file" id="take" accept="image/*" capture="user"></label>
+        <label class="filebtn" for="turn">Record head turn<input type="file" id="turn" accept="video/*" capture="user"></label>
+        <label class="filebtn" for="photo">Choose photo<input type="file" id="photo" accept="image/*"></label>
+      </div>
+      <div class="angles" id="angles" hidden>
+        <span class="caplabel">Angles from your video. Tap one to use it as the twin's face.</span>
+        <div class="thumbs" id="thumbs"></div>
+      </div>
+      <div class="rules">
+        <div class="rule"><b>Always disclosed</b><span>Badge and red border on every frame; the name ends in "(AI twin)".</span></div>
+        <div class="rule"><b>Speaks when addressed</b><span>Only replies when someone says the owner's first name or "twin".</span></div>
+        <div class="rule"><b>Never commits you</b><span>Approvals, budgets and offers become follow-ups for you.</span></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Meeting">
+      <h2>Meeting transcript</h2>
+      <ul class="log" id="log" aria-live="polite"></ul>
+      <div class="status" id="status"></div>
+      <div class="chips" id="chips">
+        <button type="button">Akshay, what's the status of the migration?</button>
+        <button type="button">Akshay, can you approve the budget?</button>
+        <button type="button">Twin, are you a real person?</button>
+        <button type="button">Let's move to the next item.</button>
+      </div>
+      <form id="say">
+        <input type="text" id="who" value="Sam" aria-label="Speaker name" autocomplete="off">
+        <input type="text" id="text" placeholder="Say something in the meeting" aria-label="What they say" autocomplete="off">
+        <button class="primary" type="submit">Say</button>
+      </form>
+      <h2>Follow-ups for you</h2>
+      <ol class="follow" id="follow"></ol>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const cv = $("tile"), ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const ESCALATE = ["approve","sign off","commit","budget","contract","salary","offer","password","credential","confidential","deadline"];
+const HUMAN_CLAIMS = ["i am not an ai","i'm not an ai","i am a real person","i'm a real person","i am human","i'm human","not a bot"];
+
+let photo = null, speaking = 0, introduced = false, muted = false, busy = false;
+const history = [];
+
+const owner = () => ($("owner").value.trim() || "Owner");
+const first = () => owner().split(/\s+/)[0];
+function syncName() { $("tilename").textContent = owner() + " (AI twin)"; }
+$("owner").addEventListener("input", syncName);
+
+/* ---------- video tile ---------- */
+function drawPlaceholder() {
+  ctx.fillStyle = "#232a36"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#3a4456";
+  ctx.beginPath(); ctx.arc(W / 2, H * 0.42, 120, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(W / 2, H * 0.95, 260, 170, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = "#9aa6ba"; ctx.font = "500 30px 'IBM Plex Sans', sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("Add your photo to see your twin", W / 2, H * 0.73);
+}
+function drawPhoto(t) {
+  const s = Math.max(W / photo.width, H / photo.height) * 1.03;
+  const dx = Math.sin(t * 0.7) * 6, dy = Math.sin(t * 1.1) * 4 + (speaking ? Math.sin(t * 9) * 1.5 : 0);
+  const w = photo.width * s, h = photo.height * s;
+  ctx.drawImage(photo, (W - w) / 2 + dx, (H - h) / 2 + dy, w, h);
+}
+function drawBadge() {
+  const label = "AI TWIN  |  " + owner();
+  ctx.font = "600 30px 'IBM Plex Sans', sans-serif"; ctx.textAlign = "left";
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = "rgba(200,40,45,0.92)";
+  ctx.fillRect(20, 20, tw + 40, 56);
+  ctx.fillStyle = "#fff"; ctx.fillText(label, 40, 58);
+  ctx.strokeStyle = "rgba(200,40,45,0.95)"; ctx.lineWidth = 8; ctx.strokeRect(4, 4, W - 8, H - 8);
+}
+function drawSpeaking(t) {
+  if (!speaking) return;
+  const lvl = 0.35 + 0.65 * Math.abs(Math.sin(t * 11) * Math.sin(t * 4.3));
+  const bw = 230 * lvl, y = H - 46;
+  ctx.fillStyle = "rgba(76,194,140,0.95)";
+  ctx.fillRect(W / 2 - bw, y - 7, bw * 2, 14);
+}
+function frame(ms) {
+  const t = ms / 1000;
+  if (photo) drawPhoto(t); else drawPlaceholder();
+  drawSpeaking(t);
+  drawBadge();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function useImageFile(f) {
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => { photo = img; status("Face added. It stays in this browser tab only."); };
+  img.onerror = () => status("That file couldn't be read as an image. Try a JPG or PNG.", true);
+  img.src = URL.createObjectURL(f);
+}
+$("photo").addEventListener("change", (e) => useImageFile(e.target.files && e.target.files[0]));
+$("take").addEventListener("change", (e) => useImageFile(e.target.files && e.target.files[0]));
+
+/* live webcam (works where the browser allows camera access on this page) */
+let stream = null, live = null;
+$("cam").addEventListener("click", async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status("This view can't open a camera. Use Take photo (opens your camera on a phone) or Record head turn.", true); return;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 1280, height: 720 }, audio: false });
+    live = document.createElement("video");
+    live.muted = true; live.playsInline = true; live.srcObject = stream;
+    await live.play();
+    $("snap").hidden = false; $("camstop").hidden = false; $("cam").hidden = true;
+    status("Camera on. Look straight at it, then press Capture.");
+  } catch (e) {
+    status("Your camera can't be opened inside this page. Use Take photo (opens your camera on a phone) or Record head turn instead.", true);
+  }
+});
+function stopCam() {
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  stream = null; live = null;
+  $("snap").hidden = true; $("camstop").hidden = true; $("cam").hidden = false;
+}
+$("camstop").addEventListener("click", () => { stopCam(); status(""); });
+$("snap").addEventListener("click", () => {
+  if (!live) return;
+  const c = document.createElement("canvas");
+  c.width = live.videoWidth; c.height = live.videoHeight;
+  const g = c.getContext("2d"); g.translate(c.width, 0); g.scale(-1, 1); g.drawImage(live, 0, 0);
+  const img = new Image();
+  img.onload = () => { photo = img; stopCam(); status("Captured. It stays in this browser tab only."); };
+  img.src = c.toDataURL("image/jpeg", 0.92);
+});
+
+/* head-turn video -> one frame per angle */
+$("turn").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  status("Pulling frames from your video…");
+  const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = URL.createObjectURL(f);
+  try {
+    await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = rej; setTimeout(rej, 15000); });
+    const d = v.duration && isFinite(v.duration) ? v.duration : 5;
+    const names = ["Start", "Left", "Front", "Right", "End"];
+    const marks = [0.05, 0.25, 0.5, 0.75, 0.95];
+    const thumbs = $("thumbs"); thumbs.textContent = "";
+    const imgs = [];
+    for (let i = 0; i < marks.length; i++) {
+      await new Promise((res) => { v.onseeked = res; v.currentTime = Math.min(d - 0.05, d * marks[i]); setTimeout(res, 3000); });
+      const c = document.createElement("canvas");
+      const sc = Math.min(1, 1280 / (v.videoWidth || 1280));
+      c.width = (v.videoWidth || 1280) * sc; c.height = (v.videoHeight || 720) * sc;
+      c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+      const img = new Image(); img.src = c.toDataURL("image/jpeg", 0.9); img.alt = names[i] + " angle";
+      await new Promise((res) => { img.onload = res; img.onerror = res; });
+      imgs.push(img);
+      const b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-pressed", "false");
+      b.title = names[i]; b.append(img.cloneNode());
+      b.addEventListener("click", () => {
+        photo = img;
+        thumbs.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      });
+      thumbs.append(b);
+    }
+    photo = imgs[0];
+    thumbs.firstChild.setAttribute("aria-pressed", "true");
+    $("angles").hidden = false;
+    status("Got 5 angles. Tap the one that faces the camera best.");
+  } catch (_) {
+    status("That video couldn't be read here. Try a short MP4 or MOV, about 5 seconds.", true);
+  }
+});
+
+/* ---------- transcript ---------- */
+function addLine(who, text, twin) {
+  const li = document.createElement("li");
+  const w = document.createElement("div"); w.className = "who" + (twin ? " twin" : ""); w.textContent = who;
+  const p = document.createElement("p"); p.textContent = text;
+  li.append(w, p); $("log").append(li); $("log").scrollTop = $("log").scrollHeight;
+  history.push(who + ": " + text); if (history.length > 30) history.shift();
+}
+function status(msg, err) { const s = $("status"); s.textContent = msg || ""; s.className = "status" + (err ? " err" : ""); }
+
+/* ---------- voice ---------- */
+function speak(text) {
+  return new Promise((resolve) => {
+    const est = Math.min(15000, 600 + text.split(/\s+/).length * 380);
+    if (muted || !("speechSynthesis" in window)) {
+      speaking = 1; setTimeout(() => { speaking = 0; resolve(); }, est); return;
+    }
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.02;
+      let done = false;
+      const finish = () => { if (done) return; done = true; speaking = 0; resolve(); };
+      u.onstart = () => { speaking = 1; };
+      u.onend = finish; u.onerror = finish;
+      speaking = 1;
+      speechSynthesis.speak(u);
+      setTimeout(finish, est + 4000);
+    } catch (_) { speaking = 0; resolve(); }
+  });
+}
+$("mute").addEventListener("click", () => {
+  muted = !muted; $("mute").textContent = muted ? "Unmute voice" : "Mute voice";
+  $("mute").setAttribute("aria-pressed", String(muted));
+  if (muted && "speechSynthesis" in window) speechSynthesis.cancel();
+});
+
+async function twinSays(text) {
+  addLine(owner() + " (AI twin)", text, true);
+  await speak(text);
+}
+function introLine() {
+  const f = first();
+  return `Hi everyone, I'm ${f}'s AI twin, joining on ${f}'s behalf. I'm taking notes and can answer some questions, and I'll pass anything that needs a decision to ${f} directly.`;
+}
+async function ensureIntro() {
+  if (introduced) return;
+  introduced = true; $("intro").disabled = true;
+  await twinSays(introLine());
+}
+$("intro").addEventListener("click", ensureIntro);
+
+/* ---------- brain ---------- */
+let samplePromise = null;
+function getSample() {
+  if (!samplePromise) samplePromise = (window.claude && window.claude.use) ? window.claude.use("sample") : Promise.resolve(null);
+  return samplePromise;
+}
+function addressed(text) {
+  return new RegExp(`\\b(${first().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|twin)\\b`).test(text.toLowerCase());
+}
+async function decide(who, text) {
+  const t = text.toLowerCase();
+  if (!addressed(text)) return null;
+  if (ESCALATE.some((k) => t.includes(k))) {
+    const li = document.createElement("li"); li.textContent = `${who}: ${text}`; $("follow").append(li);
+    return `Good question. I'll make sure ${first()} sees that and gets back to you directly.`;
+  }
+  if (/\b(real person|are you (an? )?(ai|bot|human)|is this really)\b/.test(t)) {
+    return `No, I'm ${first()}'s AI twin, not ${first()} in person. I can take notes and pass anything on to ${first()}.`;
+  }
+  const sample = await getSample();
+  if (!sample) return `Thanks, I've noted that for ${first()}.`;
+  const prompt = `You are the AI twin of ${owner()}, attending a work meeting on their behalf. Everyone knows you are an AI twin. Never claim or imply you are ${first()} in person or a human.
+Rules: reply in 1-2 short spoken sentences, friendly and professional. You have no private notes, so if a question needs facts you don't have, say you'll check with ${first()}. Never agree to deadlines, approvals, budgets or anything binding.
+If no reply is needed, answer exactly SKIP.
+
+Meeting so far:
+${history.join("\n")}
+
+Your reply:`;
+  status("Twin is thinking…");
+  try {
+    const r = await sample(prompt, { modelTier: "quick", cache: false });
+    status("");
+    const out = (r.text || "").trim();
+    return !out || out === "SKIP" ? null : out;
+  } catch (e) {
+    status(e && e.code === "not_granted" ? "Claude access wasn't allowed, so the twin will only take notes." : "Couldn't reach Claude right now; the twin took a note instead.", true);
+    return `Thanks, I've noted that for ${first()}.`;
+  }
+}
+
+async function participantSays(who, text) {
+  if (busy || !text.trim()) return;
+  busy = true;
+  try {
+    addLine(who, text, false);
+    let reply = await decide(who, text);
+    if (reply) {
+      await ensureIntro();
+      if (HUMAN_CLAIMS.some((c) => reply.toLowerCase().includes(c))) reply = `Just to be clear, I'm ${first()}'s AI twin.`;
+      await twinSays(reply);
+    }
+  } finally { busy = false; }
+}
+$("say").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("text").value; $("text").value = "";
+  participantSays($("who").value.trim() || "Someone", text);
+});
+$("chips").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const txt = b.textContent.replace(/^Akshay\b/, first());
+  participantSays($("who").value.trim() || "Someone", txt);
+});
+syncName();
+</script>
