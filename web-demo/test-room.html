@@ -16,6 +16,7 @@
 :root[data-theme="dark"] {
   --bg: #11141a; --panel: #191d25; --line: #2b313d; --fg: #e7eaf0; --muted: #98a1b2;
   --accent: #7f9cf5; --badge: #e0474c; --ok: #4cc28c; --warn: #e3a24a; --tile: #0b0d11; color-scheme: dark }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body); }
 .wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 40px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -199,7 +200,7 @@ $("take").addEventListener("change", (e) => useImageFile(e.target.files && e.tar
 let stream = null, live = null;
 $("cam").addEventListener("click", async () => {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    status("This view can't open a camera. Use Take photo (opens your camera on a phone) or Record head turn.", true); return;
+    status("Camera access is blocked here. On a Mac, take a photo in Photo Booth, drag it to your Desktop, then click Choose photo. On a phone, use Take photo.", true); return;
   }
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 1280, height: 720 }, audio: false });
@@ -209,7 +210,7 @@ $("cam").addEventListener("click", async () => {
     $("snap").hidden = false; $("camstop").hidden = false; $("cam").hidden = true;
     status("Camera on. Look straight at it, then press Capture.");
   } catch (e) {
-    status("Your camera can't be opened inside this page. Use Take photo (opens your camera on a phone) or Record head turn instead.", true);
+    status("Camera access is blocked here. On a Mac, take a photo in Photo Booth, drag it to your Desktop, then click Choose photo. On a phone, use Take photo.", true);
   }
 });
 function stopCam() {

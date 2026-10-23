@@ -1,0 +1,50 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # diff --check needs the base commit
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: System libraries for OpenCV
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
+
+      - name: Install Twinvoy with test dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Disclosure guardrails (name marker, frame badge, speech gate)
+        run: python -m pytest tests/test_disclosure.py -q
+
+      - name: Full suite
+        run: python -m pytest -q
+
+      - name: CLI starts
+        run: twinvoy --help
+
+      - name: Installer scripts parse
+        run: bash -n scripts/install.sh && bash -n scripts/setup_musetalk.sh
+
+      - name: Whitespace / conflict-marker check
+        if: github.event_name == 'pull_request'
+        run: git diff --check origin/${{ github.base_ref }}...HEAD
